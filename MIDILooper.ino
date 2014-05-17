@@ -52,7 +52,6 @@ void HandleNoteOn(byte channel, byte pitch, byte velocity) {
 void HandleControlChange(byte channel, byte number, byte value) {
   if(number == 0 || number == 32) {
     //bank select
-    
   }
   else {
     MIDI.sendControlChange(number, value, channel);
@@ -74,12 +73,15 @@ void TempoClock() {
   tick = tick+1 % 24;
   if(tick % CLOCKDIV == 0) {
     index = (index+1) % POINTS;
+    if(index == 0) {
+      MIDI.sendSongPosition(0); //not affecting volca
+    }
     //updating the points
     for(byte i=0; i<BANKS; i++) {
       if(lastInPoint[i][2] != 0) { //if note on  
         byte offInPoint[3] = { lastInPoint[i][0], lastInPoint[i][1], 0 };
         if(!pointIsEqual(sequence[i][index], offInPoint) ) {
-          for(byte j = 0; j < POINTS - index; j++) {
+          for(byte j = 1; j < POINTS - index; j++) {
             if( pointIsEqual(sequence[i][index], sequence[i][index+j]) || sequence[i][index+j][2] == 0 ) {
               setPoint( sequence[i][index+j], offInPoint ); //erase old point with note-off messages
             }
