@@ -20,10 +20,10 @@ long clock = 41667; // quarter note / 24 in microseconds (default 60BPM)
 byte tick = 0;
 byte divisor[BANKS]; //Clockticks per note for bank. Between 2 and 24 (or more?)
 
-byte lastInPoint[BANKS][3];
-byte lastOutPoint[BANKS][3];
+byte lastInPoint[BANKS][2];
+byte lastOutPoint[BANKS][2];
 byte bankTypes[BANKS][2]; //0 for unused, 1-128 for CC, 129 for note; midichannel
-byte sequence[BANKS][POINTS][3];
+byte sequence[BANKS][POINTS][2];
 byte bank = 0;
 int index = 0;
 
@@ -115,9 +115,8 @@ void HandleNoteOn(byte channel, byte pitch, byte velocity) {
   if(!test) {
     for(int i=0; i<min(BANKS, BUTTONS); i++) {
       if(bankTypes[i][0] == 129 && bankTypes[i][1] == channel) {
-        lastInPoint[bank][0] = channel;
-        lastInPoint[bank][1] = pitch + 128;
-        lastInPoint[bank][2] = velocity;
+        lastInPoint[bank][0] = pitch + 128;
+        lastInPoint[bank][1] = velocity;
         test = true;
         break;
       }
@@ -152,9 +151,8 @@ void HandleControlChange(byte channel, byte number, byte value) {
     if(!test) {
       for(int i=0; i<min(BANKS, BUTTONS); i++) {
         if(bankTypes[i][0] == number && bankTypes[i][1] == channel) {
-          lastInPoint[bank][0] = channel;
-          lastInPoint[bank][1] = number;
-          lastInPoint[bank][2] = value;
+          lastInPoint[bank][0] = number;
+          lastInPoint[bank][1] = value;
           test = true;
           break;
         }
@@ -168,11 +166,11 @@ void HandleControlChange(byte channel, byte number, byte value) {
 }
 
 boolean pointIsEqual(byte * firstPoint, byte * secondPoint) {
-  return (firstPoint[0] == secondPoint[0] && firstPoint[1] == secondPoint[1] && firstPoint[2] == secondPoint[2]);
+  return (firstPoint[0] == secondPoint[0] && firstPoint[1] == secondPoint[1]);
 }
 
 void setPoint(byte *pointToSet, byte * newValue) {
-  for(byte i=0; i < 3; i++) {
+  for(byte i=0; i < 2; i++) {
     pointToSet[i] = newValue[i];
   }
 }
@@ -191,11 +189,11 @@ void TempoClock() {
     for(byte i=0; i<BANKS; i++) {
       if(recording[i]) {
         if(digitalRead(footswitchPin)) {
-          if(lastInPoint[i][2] != 0) { //if note on  
-            byte offInPoint[3] = { lastInPoint[i][0], lastInPoint[i][1], 0 };
+          if(lastInPoint[i][1] != 0) { //if note on  
+            byte offInPoint[2] = { lastInPoint[i][0], 0 };
             if(!pointIsEqual(sequence[i][index], offInPoint) ) {
               for(byte j = 1; j < POINTS - index; j++) {
-                if( pointIsEqual(sequence[i][index], sequence[i][index+j]) || sequence[i][index+j][2] == 0 ) {
+                if( pointIsEqual(sequence[i][index], sequence[i][index+j]) || sequence[i][index+j][1] == 0 ) {
                   setPoint( sequence[i][index+j], offInPoint ); //erase old point with note-off messages
                 }
                 else {
@@ -240,13 +238,13 @@ void TempoClock() {
 
 void SendMidiOut(byte bank) {
   if(sequence[bank][index][1] != 0) {
-    if(sequence[bank][index][1] < 129) {
-      MIDI.sendControlChange(sequence[bank][index][1], sequence[bank][index][2], sequence[bank][index][0]);
+    if(sequence[bank][index][0] < 129) {
+      MIDI.sendControlChange(sequence[bank][index][0], sequence[bank][index][1], bankTypes[bank][1]);
     }
     else {
       if( !pointIsEqual(lastOutPoint[bank], sequence[bank][index])) {
-        MIDI.sendNoteOff(lastOutPoint[bank][1] - 128, 0, lastOutPoint[bank][0]);
-        MIDI.sendNoteOn(sequence[bank][index][1] - 128, sequence[bank][index][2], sequence[bank][index][0]);
+        MIDI.sendNoteOff(lastOutPoint[bank][0] - 128, 0, bankTypes[bank][1]);
+        MIDI.sendNoteOn(sequence[bank][index][0] - 128, sequence[bank][index][1], bankTypes[bank][1]);
         setPoint(lastOutPoint[bank], sequence[bank][index]);
       }
     }
